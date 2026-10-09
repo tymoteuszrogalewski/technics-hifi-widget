@@ -33,7 +33,7 @@ A small widget for the **Technics SC-C70MK2** (Ottava f): volume **−/+**, **wh
 | **CD and OPT (TV) input** — switching, play, track info | They are handled by the **main processor** of the unit, not by the network module. The API only reports `stopped`, also in the status stream on port 4545. |
 | **Port 10001** (main processor) | TLS with a client certificate (the Technics app) — closed. |
 | **CD track names** | The unit has no CD-Text/CDDB over the network. |
-| **Power on / off** | Not needed: on LAN the unit turns itself on when something starts streaming to it and goes to standby on its own. |
+| **Power on / off** | Not needed: on LAN (cable) the unit turns itself on when something starts streaming to it and goes to standby on its own. **On Wi-Fi this auto wake-up does not work.** |
 | **Real pause in Spotify** | Spotify Connect ends the session on pause (`stopped`, the track disappears). So the middle button is **stop**, the widget keeps the last track (greyed out) and "play" resumes the session. |
 
 ## Coming soon: ESP32 with infrared
