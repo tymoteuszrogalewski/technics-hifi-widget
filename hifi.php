@@ -141,7 +141,7 @@ if (($_GET['api'] ?? '') === 'set') {
 <title>HiFi</title>
 <style>
 body{margin:0;padding:12px;background:#111;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#ddd}
-.hifi{background:#1e1e1e;border:1px solid #2c2c2c;border-radius:12px;padding:10px 14px;max-width:440px}
+.hifi{box-sizing:border-box;background:#1e1e1e;border:1px solid #2c2c2c;border-radius:12px;padding:10px 14px;max-width:440px}
 .row{display:flex;align-items:center;min-height:44px;gap:8px}
 .lbl{flex:1;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#7fb0ff}
 .lbl .ic{font-size:14px;margin-right:6px}
@@ -157,7 +157,7 @@ button svg{width:20px;height:20px;fill:currentColor}
 .now .t{font-size:15px;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .now .a{font-size:12px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .now.idle img,.now.idle .tx{opacity:.45}
-.ctl{display:flex;gap:6px}
+.ctl{display:flex;align-items:center;gap:6px}
 .msg{font-size:11px;color:#a08040;min-height:14px}
 </style>
 </head>
@@ -166,7 +166,11 @@ button svg{width:20px;height:20px;fill:currentColor}
   <div class="row"><div class="lbl"><span class="ic">🎵</span>HiFi<span class="src" id="src">…</span></div></div>
   <div class="row">
     <div class="lbl">Volume</div>
-    <button data-d="-1">−</button><span class="vol" id="vol">–</span><button data-d="1">+</button>
+    <div class="ctl">
+      <button data-d="-1" title="Volume down"><svg viewBox="0 0 24 24"><path d="M5 8h14l-7 9z"/></svg></button>
+      <span class="vol" id="vol">–</span>
+      <button data-d="1" title="Volume up"><svg viewBox="0 0 24 24"><path d="M5 16h14l-7-9z"/></svg></button>
+    </div>
   </div>
   <div class="now" id="now">
     <img id="cover" alt="">

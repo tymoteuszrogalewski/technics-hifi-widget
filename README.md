@@ -4,7 +4,7 @@
 
 A small widget for the **Technics SC-C70MK2** (Ottava f): volume **−/+**, **what is playing** (cover, title, artist, album) and **previous / stop-play / next**. **One PHP file**, no database, no app, no remote control. Made for a wall tablet or any browser in your home network.
 
-![Widget](docs/widget-v1.png)
+![Widget](docs/widget-v2.png)
 
 ![Technics SC-C70MK2](docs/technics-sc-c70mk2-v1.jpg)
 
