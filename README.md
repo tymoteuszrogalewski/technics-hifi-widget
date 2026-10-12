@@ -2,9 +2,15 @@
 
 > **Fully coded by Claude AI** — not a single line of code was written manually by a human.
 
-A small widget for the **Technics SC-C70MK2** (Ottava f): volume **−/+**, **what is playing** (cover, title, artist, album) and **previous / stop-play / next**. **One PHP file**, no database, no app, no remote control. Made for a wall tablet or any browser in your home network.
+A small widget for the **Technics SC-C70MK2** (Ottava f): **previous / pause / next / stop**, volume **−/+** and optionally **what is playing** (cover, title, artist). Pause **mutes** the unit (see below why). **One PHP file**, no database, no app, no remote control. Made for a wall tablet or any browser in your home network.
 
-![Widget](docs/widget-v2.png)
+Full version (with cover and title):
+
+![Widget, full version](docs/widget-full-v3.png)
+
+Mini version (`$SHOW_TITLE = false`) — only the button row:
+
+![Widget, mini version](docs/widget-mini-v3.png)
 
 ![Technics SC-C70MK2](docs/technics-sc-c70mk2-v1.jpg)
 
@@ -18,10 +24,10 @@ A small widget for the **Technics SC-C70MK2** (Ottava f): volume **−/+**, **wh
 | Function | How |
 |---|---|
 | **Volume** −/+ in steps of 1 (scale 0-100) | `player:volume` |
-| **Mute** state | `settings:/mediaPlayer/mute` |
+| **Mute** — the pause button (crossed speaker instead of the volume number) | `settings:/mediaPlayer/mute` |
 | **What plays**: cover, title, artist, album, source | `player:player/data` |
 | **Previous / next track** | `player:player/control`, `activate` |
-| **Stop / play** | `player:player/control`, `activate` |
+| **Stop / play** — real stop, so the unit can go to standby on its own | `player:player/control`, `activate` |
 | **Resume Spotify without a phone** — also switches the unit from OPT/CD back to Spotify | `play` with the remembered Spotify session |
 | **Start volume** — the unit always wakes up with the same volume (no blast when the TV turns on) | `start-volume.php` from cron, sets the volume while in standby |
 | **Power state** (on / standby) | `settings:/system/hostPower` |
@@ -34,7 +40,7 @@ A small widget for the **Technics SC-C70MK2** (Ottava f): volume **−/+**, **wh
 | **Port 10001** (main processor) | TLS with a client certificate (the Technics app) — closed. |
 | **CD track names** | The unit has no CD-Text/CDDB over the network. |
 | **Power on / off** | Not needed: on LAN (cable) the unit turns itself on when something starts streaming to it and goes to standby on its own. **On Wi-Fi this auto wake-up does not work.** |
-| **Real pause in Spotify** | Spotify Connect ends the session on pause (`stopped`, the track disappears). So the middle button is **stop**, the widget keeps the last track (greyed out) and "play" resumes the session. |
+| **Real pause in Spotify** | Spotify Connect ends the session on pause (`stopped`, the track disappears). So the middle button **mutes** instead (the music keeps playing quietly, unmute returns to the same volume) and a separate **stop** button really stops it. After stop the widget keeps the last track (greyed out) and "play" resumes the session. |
 
 ## Coming soon: ESP32 with infrared
 
@@ -55,6 +61,7 @@ You need PHP 7.4+ with the `curl` extension, on a machine in the same network as
 
 ```php
 $HIFI_IP = '192.168.1.229';
+$SHOW_TITLE = true;   // false = mini version (only the button row); or per page: hifi.php?title=0
 ```
 
 3. Open `http://your-server/hifi.php`. Or in your own page:

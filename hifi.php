@@ -1,7 +1,7 @@
 <?php
 /**
  * hifi.php — a small widget for the Technics SC-C70MK2 (and other Technics units with the same
- * network module): volume, what is playing (cover, title, artist), previous / stop-play / next.
+ * network module): previous / pause (mute) / next / stop, volume and optionally what is playing (cover, title, artist).
  *
  * The network module inside is made by StreamUnlimited (StreamSDK). It has a local HTTP API without
  * a password that the official Technics app does not show:
@@ -15,6 +15,8 @@
 
 $HIFI_IP = '192.168.1.229';                          // IP of your Technics unit (give it a fixed lease in your router)
 $STATE_DIR = sys_get_temp_dir() . '/technics-hifi';  // last played track + last Spotify session
+$SHOW_TITLE = true;                                 // false = mini version: only the button row, no cover and title
+if (isset($_GET['title'])) $SHOW_TITLE = $_GET['title'] === '1';   // ?title=0 / ?title=1 overrides it per page
 
 // ---------------------------------------------------------------------------------------------
 // API of the unit
@@ -97,7 +99,7 @@ if (($_GET['api'] ?? '') === 'state') {
 }
 
 // ---------------------------------------------------------------------------------------------
-// POST ?api=set — op=vol (delta), op=ctl (previous | next | pause | play), op=resume (last Spotify session)
+// POST ?api=set — op=vol (delta), op=mute (on 0/1), op=ctl (previous | next | pause | play), op=resume (last Spotify session)
 // ---------------------------------------------------------------------------------------------
 
 if (($_GET['api'] ?? '') === 'set') {
@@ -111,6 +113,14 @@ if (($_GET['api'] ?? '') === 'set') {
         if ($cur === null) { echo json_encode(['ok' => false, 'offline' => true]); exit; }
         $v = max(0, min(100, (int)$cur['i32_'] + $delta));
         echo json_encode(['ok' => hifi_set('player:volume', ['type' => 'i32_', 'i32_' => $v]), 'volume' => $v]);
+        exit;
+    }
+
+    if ($op === 'mute') {
+        // Pause from the widget = MUTE: pause in Spotify Connect ends the session and play starts over.
+        // The music keeps playing quietly, the volume stays untouched, unmute returns to the same level.
+        $on = !empty($_POST['on']);
+        echo json_encode(['ok' => hifi_set('settings:/mediaPlayer/mute', ['type' => 'bool_', 'bool_' => $on]), 'mute' => $on]);
         exit;
     }
 
@@ -141,44 +151,46 @@ if (($_GET['api'] ?? '') === 'set') {
 <title>HiFi</title>
 <style>
 body{margin:0;padding:12px;background:#111;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#ddd}
-.hifi{box-sizing:border-box;background:#1e1e1e;border:1px solid #2c2c2c;border-radius:12px;padding:10px 14px;max-width:440px}
-.row{display:flex;align-items:center;min-height:44px;gap:8px}
-.lbl{flex:1;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#7fb0ff}
-.lbl .ic{font-size:14px;margin-right:6px}
-.src{font-size:13px;color:#999;margin-left:8px;font-weight:400;letter-spacing:0;text-transform:none}
-button{background:#2a2a2a;border:none;border-radius:6px;color:#9cc0ff;cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-button:active{background:#333;transform:scale(0.93)}
-button svg{width:20px;height:20px;fill:currentColor}
-.vol{font-size:24px;font-weight:300;min-width:44px;text-align:center}
-.vol.mute{color:#666;text-decoration:line-through}
-.now{display:none;align-items:center;gap:10px;padding:4px 0 6px}
-.now img{width:48px;height:48px;border-radius:6px;object-fit:cover;background:#262626;flex:0 0 48px}
-.now .tx{min-width:0;flex:1}
-.now .t{font-size:15px;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.now .a{font-size:12px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hifi{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;max-width:440px}
+.now{display:flex;align-items:center;gap:10px;min-height:44px}
+.now img{width:44px;height:44px;border-radius:6px;object-fit:cover;background:#262626;flex:0 0 44px}
+.now .tx{min-width:0;flex:1;white-space:nowrap}
+.now .t{font-size:15px;font-weight:600;color:#eee;overflow:hidden;text-overflow:ellipsis}
+.now .a{font-size:12px;color:#999;overflow:hidden;text-overflow:ellipsis}
 .now.idle img,.now.idle .tx{opacity:.45}
-.ctl{display:flex;align-items:center;gap:6px}
+.row{display:flex;gap:8px}
+.grp{display:flex;align-items:center;flex:1;background:rgba(255,255,255,0.06);border-radius:10px}
+.grp button{flex:1;height:44px;background:none;border:none;border-radius:10px;color:#ddd;cursor:pointer;padding:0;
+  display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.grp button:active{background:rgba(255,255,255,0.08);transform:scale(0.93)}
+.grp svg{width:28px;height:28px;fill:currentColor;display:block}
+#pp{color:#4a9eff}
+.vol{flex:0 0 40px;text-align:center;font:700 18px/1 system-ui,sans-serif;color:#fff}
+.vol svg{width:26px;height:26px;fill:#888;display:block;margin:0 auto}
 .msg{font-size:11px;color:#a08040;min-height:14px}
 </style>
 </head>
 <body>
 <div class="hifi">
-  <div class="row"><div class="lbl"><span class="ic">🎵</span>HiFi<span class="src" id="src">…</span></div></div>
+  <?php if ($SHOW_TITLE): ?>
+  <!-- What plays: the last track stays after stop (greyed out), so there is something to resume -->
+  <div class="now idle" id="now">
+    <img id="cover" alt="" style="display:none">
+    <div class="tx"><div class="t" id="title">HiFi</div><div class="a" id="artist">…</div></div>
+  </div>
+  <?php endif; ?>
   <div class="row">
-    <div class="lbl">Volume</div>
-    <div class="ctl">
+    <div class="grp">
+      <button data-ctl="previous" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button data-ctl="pp" id="pp" title="Pause (mute) / play"><svg viewBox="0 0 24 24"><path id="pp-ic" d="M7 5v14l12-7z"/></svg></button>
+      <button data-ctl="next" title="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+      <!-- Real stop: pause only mutes and the music keeps going, so without stop the unit would never go to standby -->
+      <button data-ctl="stop" title="Stop"><svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg></button>
+    </div>
+    <div class="grp">
       <button data-d="-1" title="Volume down"><svg viewBox="0 0 24 24"><path d="M5 8h14l-7 9z"/></svg></button>
       <span class="vol" id="vol">–</span>
       <button data-d="1" title="Volume up"><svg viewBox="0 0 24 24"><path d="M5 16h14l-7-9z"/></svg></button>
-    </div>
-  </div>
-  <div class="now" id="now">
-    <img id="cover" alt="">
-    <div class="tx"><div class="t" id="title"></div><div class="a" id="artist"></div></div>
-    <div class="ctl">
-      <button data-ctl="previous" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
-      <button data-ctl="pp" id="pp" title="Stop / play"><svg viewBox="0 0 24 24"><path id="pp-ic" d="M6 6h12v12H6z"/></svg></button>
-      <button data-ctl="next" title="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
     </div>
   </div>
   <div class="msg" id="msg"></div>
@@ -186,53 +198,80 @@ button svg{width:20px;height:20px;fill:currentColor}
 
 <script>
 var $ = function(id){ return document.getElementById(id); };
-var last = null, state = '';
+var last = null, state = '', mute = false, vol = null;
+// Muted: a crossed speaker instead of the volume number
+var SPK_X = '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9z"/><path d="M16 9l6 6M22 9l-6 6" stroke="#888" stroke-width="2" stroke-linecap="round" fill="none"/></svg>';
 
 function post(data){
   return fetch('?api=set', {method: 'POST', body: new URLSearchParams(data)}).then(function(r){ return r.json(); });
 }
 
+function paintVol(){
+  if (mute) $('vol').innerHTML = SPK_X;
+  else $('vol').textContent = vol === null ? '–' : vol;
+}
+// Middle button: playing and not muted = PAUSE icon, otherwise PLAY
+function paintPp(){
+  $('pp-ic').setAttribute('d', state === 'playing' && !mute ? 'M6 5h4v14H6zM14 5h4v14h-4z' : 'M7 5v14l12-7z');
+}
+function setMute(on){
+  mute = on; paintPp(); paintVol();
+  post({op: 'mute', on: on ? 1 : 0}).then(function(){ setTimeout(poll, 800); });
+}
+
 function show(d){
   if (!d || !d.ok) {
-    $('vol').textContent = '–';
-    $('src').textContent = d && d.offline ? 'off / no connection' : '';
+    vol = null; state = ''; paintVol();
+    if (!last && $('title')) { $('title').textContent = 'HiFi'; $('artist').textContent = d && d.offline ? 'off / no connection' : ''; }
     return;
   }
-  $('vol').textContent = d.volume;
-  $('vol').classList.toggle('mute', !!d.mute);
-  if (d.title) last = {title: d.title, artist: [d.artist, d.album].filter(Boolean).join(' · '), cover: d.cover, src: d.src};
-  else if (!last && d.last) last = {title: d.last.title, artist: [d.last.artist, d.last.album].filter(Boolean).join(' · '), cover: d.last.cover, src: d.last.src};
+  state = d.state; mute = !!d.mute; vol = d.volume;
+  paintVol(); paintPp();
+  if (d.title) last = {title: d.title, artist: d.artist, cover: d.cover, src: d.src};
+  else if (!last && d.last) last = {title: d.last.title, artist: d.last.artist, cover: d.last.cover, src: d.last.src};
+  if (!$('now')) return;
+  // Second line: artist · source when playing; otherwise artist · paused / not playing.
   // When nothing streams, the unit cannot tell "stopped" from "CD / OPT is playing" — so just "not playing".
-  $('src').textContent = d.state === 'playing' ? (d.srcName || '—') : (d.state === 'paused' ? d.srcName + ' (paused)' : 'Spotify not playing');
-  // Pause in Spotify Connect stops the session anyway (state "stopped"), so the middle button is STOP.
-  $('pp-ic').setAttribute('d', d.state === 'playing' ? 'M6 6h12v12H6z' : 'M7 5v14l12-7z');
-  state = d.state;
+  var st = state === 'playing' ? (mute ? 'muted' : (d.srcName || '')) : (state === 'paused' ? 'paused' : 'not playing');
   if (last) {
     $('title').textContent = last.title;
-    $('artist').textContent = last.artist;
+    $('artist').textContent = [last.artist, st].filter(Boolean).join(' · ');
     if (last.cover && $('cover').getAttribute('src') !== last.cover) $('cover').setAttribute('src', last.cover);
     $('cover').style.display = last.cover ? '' : 'none';
-    $('now').classList.toggle('idle', d.state !== 'playing');
-    $('now').style.display = 'flex';
+  } else {
+    $('title').textContent = 'HiFi';
+    $('artist').textContent = state === 'playing' ? st : 'Spotify not playing';
   }
+  $('now').classList.toggle('idle', state !== 'playing' || mute);
 }
 
 function poll(){ fetch('?api=state').then(function(r){ return r.json(); }).then(show).catch(function(){ show(null); }); }
 
 document.querySelectorAll('[data-d]').forEach(function(b){
   b.onclick = function(){
-    var d = parseInt(b.dataset.d, 10), cur = parseInt($('vol').textContent, 10);
-    if (!isNaN(cur)) $('vol').textContent = Math.max(0, Math.min(100, cur + d));   // optimistic, poll confirms
-    post({op: 'vol', delta: d}).then(function(r){ if (r.ok) $('vol').textContent = r.volume; else poll(); });
+    var d = parseInt(b.dataset.d, 10);
+    if (vol !== null) { vol = Math.max(0, Math.min(100, vol + d)); paintVol(); }   // optimistic, poll confirms
+    post({op: 'vol', delta: d}).then(function(r){ if (r.ok) { vol = r.volume; paintVol(); } else poll(); });
   };
 });
 
 document.querySelectorAll('[data-ctl]').forEach(function(b){
   b.onclick = function(){
     var c = b.dataset.ctl;
-    if (c === 'pp') {
-      if (state === 'playing') c = 'pause';
-      else if (state !== 'paused' && last && last.src === 'spotify') {
+    if (c === 'stop') {
+      // Real stop of Spotify + unmute, so the unit is not left muted for the next source (phone, TV).
+      // After a while without playing the unit goes to standby on its own.
+      if (mute) setMute(false);
+      c = 'pause';
+    }
+    else if (c === 'pp') {
+      // PAUSE = MUTE: pause in Spotify Connect ends the session and "play" starts the playlist from the top.
+      // Muted music keeps playing quietly, unmute brings back the same volume (the unit does not change it).
+      // Muted and stopped (e.g. the unit went to standby meanwhile): one click unmutes and resumes.
+      if (mute) { setMute(false); if (state === 'playing') return; }
+      else if (state === 'playing') { setMute(true); return; }
+      if (state === 'paused') c = 'play';
+      else if (last && last.src === 'spotify') {
         post({op: 'resume'}).then(function(r){ $('msg').textContent = r.ok ? '' : (r.error || 'Could not resume'); setTimeout(poll, 1500); });
         return;
       }
